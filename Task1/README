@@ -1,6 +1,6 @@
 The provided source code uses two well-known libraries: cpr for making HTTP requests and nlohmann/json for processing JSON data. This choice plays an important role in the task at hand, allowing you to effectively interact with the Solana RPC API and manipulate its responses.
 
-Key components of the source code:
+**Key components of the source code:**
 
 HTTP Requests: The cpr library is used to make POST requests to the Solana RPC API endpoint. Although the task mentions GET methods, the actual interaction with Solana RPC involves sending POST requests calling specific methods on the payload. This is common practice for interacting with the JSON-RPC API.
 JSON manipulation: The nlohmann/json library provides an intuitive way to create JSON payloads for requests and parse JSON responses. This library was chosen because of its ease of use, efficiency, and widespread acceptance in the C++ community.
