@@ -22,6 +22,7 @@ A highly-regarded JSON library for C++, providing a straightforward approach to 
 
 ### Installation
 
+Install CPR
 ```bash
 git clone https://github.com/whoshuu/cpr.git
 cd cpr
@@ -30,3 +31,7 @@ cmake ..
 make
 sudo make install
 
+Install nlohmann/json
+```bash
+sudo apt-get update
+sudo apt-get install nlohmann-json3-dev
