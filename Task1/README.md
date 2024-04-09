@@ -37,3 +37,12 @@ Install nlohmann/json
 sudo apt-get update
 sudo apt-get install nlohmann-json3-dev
 ```
+
+### Run
+
+```bash
+mkdir build
+cd build
+cmake ..
+make
+./task1
