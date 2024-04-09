@@ -30,8 +30,10 @@ mkdir build && cd build
 cmake ..
 make
 sudo make install
+```
 
 Install nlohmann/json
 ```bash
 sudo apt-get update
 sudo apt-get install nlohmann-json3-dev
+```
