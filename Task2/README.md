@@ -13,9 +13,5 @@ The solution leverages a thread pool for concurrency, ensuring that the INVOKE e
 - `cpr`: A modern C++ HTTP library for making network requests. Chosen for its simplicity and effectiveness in handling HTTP requests.
 - `nlohmann/json`: A JSON library for modern C++. Selected for its ease of use in parsing and working with JSON data.
 
-## Building and Running
-### Prerequisites:
-- C++17 compiler
-- CMake (version 3.14 or higher)
-- Dependencies: cpr, nlohmann/json (The build system will handle downloading these.)
+
 
