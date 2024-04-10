@@ -36,6 +36,9 @@ sudo apt-get install nlohmann-json3-dev
 ```bash
 mkdir build
 cd build
+cmake ..
+make
+./task1
 
 
 
