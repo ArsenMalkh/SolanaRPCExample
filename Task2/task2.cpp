@@ -21,8 +21,10 @@ private:
 
 public:
     void enqueue(T value) {
-        std::lock_guard<std::mutex> lock(mtx);
-        queue.push(std::move(value));
+        {
+            std::lock_guard<std::mutex> lock(mtx);
+            queue.push(std::move(value));
+        }
         cond.notify_one();
     }
 
@@ -40,7 +42,6 @@ public:
     }
 };
 
-// Custom type for holding request results along with their metadata.
 struct RequestResult {
     nlohmann::json response;
     std::chrono::steady_clock::time_point timestamp;
@@ -54,9 +55,10 @@ private:
     std::atomic<bool> stop{false};
 
     void worker() {
-        while (!stop) {
+        while (true) {
             auto task = tasks.dequeue();
-            if (task) task();
+            if (!task) break; // Проверка на пустую задачу
+            task();
         }
     }
 
@@ -69,13 +71,19 @@ public:
 
     ~ThreadPool() {
         stop = true;
+        // Добавляем пустую задачу для каждого рабочего потока
+        for (size_t i = 0; i < workers.size(); ++i) {
+            tasks.enqueue(nullptr);
+        }
         for (auto& worker : workers) {
             if(worker.joinable()) worker.join();
         }
     }
 
     void enqueue(std::function<void()> task) {
-        tasks.enqueue(std::move(task));
+        if (!stop) {
+            tasks.enqueue(std::move(task));
+        }
     }
 };
 
@@ -99,12 +107,7 @@ private:
         auto end = std::chrono::steady_clock::now();
         std::chrono::milliseconds latency = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-	// Store the response along with its retrieval time and latency.
-        results.enqueue({jsonResponse, std::chrono::steady_clock::now(), latency});
-	
-	//if uncomment will be Task2 point2
-        // Optionally, you can log the response for debugging.
-        // std::cout << "Response: " << jsonResponse.dump(4) << std::endl;
+        results.enqueue({jsonResponse, end, latency});
     }
 
 public:
@@ -119,7 +122,6 @@ public:
         // No action for EventType::NOTHING
     }
 
-    // Method to retrieve and remove the oldest request result.
     RequestResult getOldestResult() {
         return results.dequeue();
     }
@@ -130,18 +132,18 @@ public:
 };
 
 int main() {
-    EventHandler handler(4); // Create an EventHandler with a pool of 4 threads.
+    EventHandler handler(4); // Создание EventHandler с пулом из 4 потоков
 
-    // Simulate receiving multiple events.
+    // Симуляция получения множества событий
     handler.handle_event(EventType::INVOKE);
     handler.handle_event(EventType::ERROR);
     handler.handle_event(EventType::NOTHING);
     handler.handle_event(EventType::INVOKE);
 
-    // Give some time for all tasks to finish.
+    // Даем время для выполнения всех задач
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    // Retrieve and print the oldest result.
+    // Получаем и печатаем старейший результат
     if (!handler.resultsEmpty()) {
         auto oldestResult = handler.getOldestResult();
         std::cout << "Oldest Response: " << oldestResult.response.dump(4) 
