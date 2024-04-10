@@ -38,4 +38,4 @@ mkdir build
 cd build
 cmake ..
 make
-./task1
+./task2

@@ -4,9 +4,11 @@
 #include <mutex>
 #include <condition_variable>
 #include <queue>
+#include <deque>
 #include <functional>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cpr/cpr.h>
 #include <nlohmann/json.hpp>
 
@@ -57,7 +59,7 @@ private:
     void worker() {
         while (true) {
             auto task = tasks.dequeue();
-            if (!task) break; // Check for an empty task
+            if (!task) break; // Check for a null task
             task();
         }
     }
@@ -71,7 +73,7 @@ public:
 
     ~ThreadPool() {
         stop = true;
-        // Adding an empty task for each worker thread
+        // Add a null task for each worker thread to allow them to exit
         for (size_t i = 0; i < workers.size(); ++i) {
             tasks.enqueue(nullptr);
         }
@@ -91,6 +93,11 @@ class EventHandler {
 private:
     ThreadPool pool;
     SafeQueue<RequestResult> results;
+    std::chrono::seconds timeWindow;
+    mutable std::mutex latencyMtx;
+    std::deque<RequestResult> latencyWindow;
+    long long sumLatencies{0};
+    long long sumSquaredLatencies{0};
 
     void performRPCRequest() {
         auto start = std::chrono::steady_clock::now();
@@ -107,11 +114,30 @@ private:
         auto end = std::chrono::steady_clock::now();
         std::chrono::milliseconds latency = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-        results.enqueue({jsonResponse, end, latency});
+        RequestResult result{jsonResponse, end, latency};
+        results.enqueue(result);
+        updateLatencyStats(result);
+    }
+
+    void updateLatencyStats(const RequestResult& result) {
+        std::lock_guard<std::mutex> lock(latencyMtx);
+        
+        // Add new result
+        latencyWindow.push_back(result);
+        sumLatencies += result.latency.count();
+        sumSquaredLatencies += std::pow(result.latency.count(), 2);
+
+        // Remove old results outside the time window
+        auto now = std::chrono::steady_clock::now();
+        while (!latencyWindow.empty() && (now - latencyWindow.front().timestamp) > timeWindow) {
+            sumLatencies -= latencyWindow.front().latency.count();
+            sumSquaredLatencies -= std::pow(latencyWindow.front().latency.count(), 2);
+            latencyWindow.pop_front();
+        }
     }
 
 public:
-    EventHandler(size_t threads) : pool(threads) {}
+    EventHandler(size_t threads, std::chrono::seconds win) : pool(threads), timeWindow(win) {}
 
     void handle_event(EventType event) {
         if(event == EventType::INVOKE) {
@@ -129,26 +155,37 @@ public:
     bool resultsEmpty() const {
         return results.empty();
     }
+
+    double getLatencyStdDev() {
+        std::lock_guard<std::mutex> lock(latencyMtx);
+        if (latencyWindow.empty()) return 0.0;
+        double mean = static_cast<double>(sumLatencies) / latencyWindow.size();
+        double meanSq = static_cast<double>(sumSquaredLatencies) / latencyWindow.size();
+        return std::sqrt(meanSq - std::pow(mean, 2));
+    }
 };
 
 int main() {
-    EventHandler handler(4); // Creating EventHandler with a pool of 4 threads
+    EventHandler handler(4, std::chrono::seconds(30)); // EventHandler with a pool of 4 threads and a 30-second window for latency tracking
 
-    // Simulating receiving multiple events
+    // Simulate receiving multiple events
     handler.handle_event(EventType::INVOKE);
     handler.handle_event(EventType::ERROR);
     handler.handle_event(EventType::NOTHING);
     handler.handle_event(EventType::INVOKE);
 
-    // Allowing time for all tasks to execute
+    // Allow time for all tasks to complete
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    // Retrieve and print the oldest result
+    // Get and print the oldest result
     if (!handler.resultsEmpty()) {
         auto oldestResult = handler.getOldestResult();
         std::cout << "Oldest Response: " << oldestResult.response.dump(4) 
                   << ", Latency: " << oldestResult.latency.count() << "ms" << std::endl;
     }
+
+    // Print standard deviation of latencies
+    std::cout << "Standard Deviation of Latencies: " << handler.getLatencyStdDev() << "ms" << std::endl;
 
     return 0;
 }
