@@ -39,6 +39,3 @@ cd build
 cmake ..
 make
 ./task1
-
-
-
