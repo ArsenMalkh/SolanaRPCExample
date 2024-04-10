@@ -3,7 +3,6 @@
 #include <iostream>
 
 int main() {
-    // The endpoint URL for the Solana RPC API
     std::string url = "https://api.mainnet-beta.solana.com";
 
     // Prepare the JSON payload for the RPC method call
